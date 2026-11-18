@@ -1,0 +1,14 @@
+.root { -fx-font-family: "Segoe UI"; -fx-font-size: 13px; -fx-base: #f3f6f4; -fx-background-color: #f3f6f4; -fx-accent: #18735b; -fx-focus-color: #18735b; }
+.banner { -fx-background-color: #173e38; -fx-padding: 18 24; -fx-spacing: 4; }
+.banner .label { -fx-text-fill: #dcf0e9; }
+.banner .heading { -fx-font-size: 25px; -fx-font-weight: bold; -fx-text-fill: white; }
+.page { -fx-padding: 18 22; -fx-spacing: 12; }
+.metric { -fx-font-size: 16px; -fx-font-weight: bold; }
+.button { -fx-cursor: hand; -fx-padding: 7 13; }
+.primary { -fx-background-color: #176c54; -fx-text-fill: white; }
+.tab-pane .tab-header-area { -fx-padding: 7 20 0 20; }
+.status { -fx-padding: 10 22; -fx-background-color: #e3eeea; }
+.error { -fx-text-fill: #8c2830; -fx-background-color: #f8e4df; }
+.table-view, .text-area, .chart { -fx-background-color: white; }
+.chart-series-line { -fx-stroke: #196e58; }
+.chart-title { -fx-font-size: 15px; }

@@ -1,0 +1,10 @@
+.tools/
+target/
+.idea/
+*.iml
+.vscode/
+.github/modernize/
+.env
+.env.*
+!.env.example
+.wallet-java/

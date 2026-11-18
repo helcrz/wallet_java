@@ -1,0 +1,167 @@
+% !TeX program = pdflatex
+% Document autonome. Sur Overleaf, choisir ce fichier comme document principal.
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern,microtype}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,booktabs,tabularx,array,xcolor}
+\usepackage[hidelinks]{hyperref}
+\definecolor{foret}{HTML}{173E38}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\rubrique}[1]{\section*{\textcolor{foret}{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\renewcommand{\arraystretch}{1.15}
+\hypersetup{pdftitle={Atelier portefeuille},pdfsubject={Gestion et optimisation d'un portefeuille financier en Java}}
+\begin{document}
+
+{\small\scshape INSA Rouen Normandie \hfill Génie mathématique}\\[1.4em]
+{\Huge\bfseries\color{foret} Atelier portefeuille\par}
+{\Large Gestion et optimisation d'un portefeuille financier en Java\par}
+{\small Projet de quatrième année d'école d'ingénieur \hfill 2026--2027\par}
+\medskip\hrule\medskip
+
+\rubrique{Du choix d'un titre à la décision d'achat}
+
+Acheter une action avec les liquidités du portefeuille change immédiatement son exposition au risque. À prix constant et en l'absence de frais, la valeur totale reste pourtant identique au moment de l'achat. L'application permet d'observer ces deux effets séparément. L'utilisateur choisit une action ou un ETF, consulte son cours, puis étudie l'incidence d'un achat avant de l'inscrire au journal de simulation.
+
+\subsection*{Parcours dans le tableau de bord}
+\begin{enumerate}
+\item À la création du portefeuille, choisir un nom et un capital initial en dollars américains.
+\item Dans \textbf{Marché et ordres}, ouvrir \textbf{Choisir un titre}. Une recherche sur «~Apple~» affiche le nom et le symbole \code{AAPL}. La sélection renseigne le formulaire et lance la consultation du cours.
+\item Saisir une quantité et cliquer sur \textbf{Étudier l'achat}. L'aperçu compare le poids du titre et la volatilité annualisée avant et après l'opération. Il donne aussi les liquidités qui resteraient disponibles.
+\item Valider avec \textbf{Acheter}. En mode Alpaca, l'application redemande le dernier prix disponible au moment de la simulation. Le journal conserve le prix retenu et son horodatage. Un mouvement du marché peut donc expliquer un écart avec l'aperçu.
+\end{enumerate}
+
+\subsection*{Origine des cours}
+\begin{tabularx}{\linewidth}{@{}lYY@{}}
+\toprule
+Mode & Prix de l'opération & Titres proposés et historique \\
+\midrule
+Démonstration & Dernier prix d'une série fictive reproductible. & Cinq titres et 100 séances simulées par titre. \\
+Alpha Vantage & Dernière clôture quotidienne reçue. & Catalogue des cotations américaines actives et historique quotidien au format compact. \\
+Alpaca & Dernière transaction disponible sur IEX, affichée à l'heure de Paris. & Catalogue américain des titres actifs et négociables hors OTC. Jusqu'à 100 clôtures antérieures par titre. \\
+\bottomrule
+\end{tabularx}
+
+En mode Alpaca, l'onglet interroge le flux toutes les 15 secondes pendant le suivi du titre. Un échange peu fréquent ou un marché fermé peuvent laisser le prix inchangé entre deux consultations. L'heure de transaction permet d'en apprécier l'ancienneté.
+
+\newpage
+\rubrique{Architecture et intégrité des opérations}
+
+Le projet utilise Java~21, JavaFX pour l'interface et Maven pour construire l'application et lancer les tests. Les responsabilités suivent le découpage en sept classes du document de conception \emph{Projet\_java (1)}.
+
+\begin{tabularx}{\linewidth}{@{}lY@{}}
+\toprule
+Classe & Responsabilité dans l'application \\
+\midrule
+\code{MainApp} & Initialise les services, ouvre ou crée le portefeuille et affiche la fenêtre. \\
+\code{DashboardController} & Lit les saisies, lance les requêtes en arrière-plan et actualise les tableaux et les graphiques JavaFX. \\
+\code{AssetPosition} & Représente un titre détenu, sa quantité et son prix moyen d'achat. Calcule sa valeur et son gain latent. \\
+\code{Portfolio} & Regroupe les positions, les liquidités, le profil et le journal. Construit un nouvel état après validation d'une transaction. \\
+\code{MarketDataApi} & Fournit le catalogue, les prix datés et les historiques selon le mode choisi. \\
+\code{PortfolioService} & Coordonne les cours, les simulations, les analyses et la sauvegarde. \\
+\code{AnalysisService} & Aligne les rendements, mesure le risque et résout le problème d'allocation. \\
+\bottomrule
+\end{tabularx}
+
+\subsection*{Comptabilité d'une position}
+Pour une position de quantité $q$ et de prix moyen $\bar p$, l'achat de $a$ unités au prix unitaire $p$ débite les liquidités de $ap$. Le nouveau prix moyen vaut
+\[
+    \bar p_{\mathrm{nouveau}}=\frac{q\bar p+ap}{q+a}.
+\]
+Lors d'une vente partielle, les titres restants conservent leur prix moyen. Les quantités et montants sont représentés par \code{BigDecimal}. L'application exige une quantité positive, des liquidités suffisantes à l'achat et un nombre de titres suffisant à la vente.
+
+\subsection*{Exemple vérifiable}
+Avec un capital de $10\,000$~USD, deux achats successifs de deux titres à 100~USD puis de trois titres à 150~USD donnent cinq titres au prix moyen de 130~USD. Une vente de deux titres à 150~USD laisse $9\,650$~USD de liquidités et trois titres valorisés à 450~USD. Le gain total de 100~USD se décompose en 40~USD réalisés à la vente et 60~USD encore latents. La performance depuis la création atteint donc $1\,\%$.
+
+\subsection*{Sauvegarde locale}
+Le service écrit le nouvel état dans un fichier temporaire, puis remplace la sauvegarde JSON par déplacement atomique avant de publier l'état en mémoire. Un verrou empêche deux instances d'écrire simultanément dans le même portefeuille. Le fichier \code{demo.json} conserve les simulations fictives et \code{portefeuille.json} les simulations sur données de marché. Tous deux se trouvent dans le dossier \code{.wallet-java} du répertoire utilisateur.
+
+\newpage
+\rubrique{Mesurer la performance et le risque}
+
+Si $C$ désigne les liquidités, $q_i$ la quantité du titre $i$, $P_i$ son dernier prix disponible et $V_0$ le capital initial, la valeur courante $V$, la performance cumulée $R$ et le poids du titre $w_i$ vérifient
+\[
+   V=C+\sum_{i=1}^{n}q_iP_i,\qquad
+   R=\frac{V-V_0}{V_0},\qquad
+   w_i=\frac{q_iP_i}{V}.
+\]
+Le poids des liquidités vaut $C/V$. La courbe historique de l'onglet \textbf{Analyse} répond à une question précise~: combien aurait valu la composition \emph{actuelle} aux clôtures précédentes, en gardant les quantités et les liquidités fixes~? Le journal permet, lui, de retrouver la chronologie des opérations simulées.
+
+\subsection*{Construire un échantillon comparable}
+Pour un intervalle de séances $t-1,t$, le rendement simple du titre $i$ vaut $r_{i,t}=P_{i,t}/P_{i,t-1}-1$. L'application retient uniquement les intervalles dont les deux dates sont communes et consécutives dans chacune des séries. Par exemple, si un titre possède un cours le mardi et qu'un autre passe directement du lundi au mercredi, l'intervalle lundi--mercredi est écarté. Cela évite de comparer des variations mesurées sur des durées différentes.
+
+Avec $T\geq 2$ rendements communs, l'application estime le vecteur moyen $\mu$ et la matrice de covariance $\Sigma$ par
+\[
+  \mu_i=\frac{1}{T}\sum_{t=1}^{T} r_{i,t},\qquad
+  \Sigma_{ij}=\frac{1}{T-1}\sum_{t=1}^{T}(r_{i,t}-\mu_i)(r_{j,t}-\mu_j).
+\]
+La corrélation $\rho_{ij}=\Sigma_{ij}/\sqrt{\Sigma_{ii}\Sigma_{jj}}$ devient indéfinie si l'une des séries est constante. L'interface signale ce cas.
+
+\subsection*{Interpréter les indicateurs}
+Avec 252 séances par an, des liquidités sans rendement et un taux sans risque nul, les estimations annualisées sont
+\[
+   m_p=252\,w^\top\mu,\qquad
+   \sigma_p=\sqrt{252\,w^\top\Sigma w},\qquad
+   S_p=\frac{m_p}{\sigma_p}\quad(\sigma_p>0).
+\]
+$m_p$ désigne une moyenne historique annualisée. La performance $R$ mesure le gain effectivement constaté dans la simulation depuis sa création. Ces deux mesures répondent à des questions différentes.
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Profil & Seuil de volatilité annuelle & Seuil de poids par titre \\
+\midrule
+Prudent & 10\,\% & 25\,\% \\
+Équilibré & 20\,\% & 40\,\% \\
+Dynamique & 30\,\% & 60\,\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+Le niveau de risque est faible jusqu'à la moitié du seuil de volatilité, modéré jusqu'au seuil et élevé au-delà. Le dépassement du seuil de poids déclenche une alerte de concentration. Une corrélation supérieure à $0{,}80$ signale deux titres ayant souvent évolué dans le même sens sur la période observée.
+
+\newpage
+\rubrique{Allocation de Markowitz et validation}
+
+\subsection*{Minimiser la variance sous contraintes}
+L'utilisateur choisit les titres, un plafond $u$ par titre et, s'il le souhaite, un rendement annuel minimal $r_\star$. Le solveur quadratique ojAlgo détermine une allocation théorique $x$ en résolvant
+\[
+\begin{aligned}
+  &\underset{x}{\operatorname{minimiser}} && x^\top\Sigma x \\
+  &\text{sous les contraintes} && \sum_{i=1}^{n} x_i=1,\qquad 0\leq x_i\leq u, \\
+  & && 252\,\mu^\top x\geq r_\star \quad \text{si une cible est saisie.}
+\end{aligned}
+\]
+Les poids proposés investissent tout le capital dans les titres sélectionnés. Les poids actuels affichés à côté sont calculés sur la valeur totale, liquidités comprises. Une condition nécessaire de faisabilité est $nu\geq1$. Avec deux titres plafonnés à $40\,\%$, seuls $80\,\%$ du capital pourraient être répartis. Le programme signale cette incompatibilité.
+
+\subsection*{Un optimum contrôlable à la main}
+Le test de référence prend deux actifs de covariance nulle, de variances journalières $0{,}0001$ et $0{,}0004$. En donnant le poids $x$ au premier, la variance du portefeuille vaut $0{,}0001x^2+0{,}0004(1-x)^2$. Sa dérivée s'annule pour $x=0{,}8$~: l'allocation de variance minimale est donc $80\,\%/20\,\%$. Avec un plafond de $60\,\%$ par titre, l'optimum devient $60\,\%/40\,\%$. Ces résultats servent de référence indépendante pour vérifier le solveur.
+
+\subsection*{Résultats des tests}
+Les rapports Maven Surefire de la version étudiée comptent \textbf{15 tests réussis}.
+
+\begin{tabularx}{\linewidth}{@{}lrY@{}}
+\toprule
+Suite JUnit & Tests & Exemples de contrôles \\
+\midrule
+\code{PortfolioTest} & 4 & Coût moyen, vente, refus des ordres invalides, rechargement JSON. \\
+\code{AnalysisTest} & 4 & Rendements connus, covariance, dates manquantes, optimum sous contraintes. \\
+\code{MarketDataTest} & 6 & Catalogues fournisseurs, quotas, devise, prix IEX et horodatage au journal. \\
+\code{DashboardTest} & 1 & Recherche d'Apple par nom, sélection, aperçu, achat, analyse, optimisation et vente dans JavaFX. \\
+\bottomrule
+\end{tabularx}
+
+\subsection*{Portée des résultats}
+Les tests HTTP utilisent un serveur local aux réponses contrôlées. Ils vérifient notamment qu'un échec de cotation empêche l'enregistrement d'un achat. La couverture IEX, les clôtures brutes, l'absence de frais et la taille de l'échantillon limitent l'interprétation financière des résultats. L'intérêt pédagogique du simulateur tient à la possibilité de confronter chaque poids proposé à une hypothèse identifiable~: prix observé, historique commun, plafond ou rendement cible.
+
+\smallskip
+{\small\textbf{Documentation des flux.}
+\href{https://docs.alpaca.markets/us/docs/about-market-data-api}{Alpaca, Market Data API}
+\quad$\cdot$\quad
+\href{https://www.alphavantage.co/documentation/}{Alpha Vantage, documentation des séries et des cotations}.}
+
+\end{document}
